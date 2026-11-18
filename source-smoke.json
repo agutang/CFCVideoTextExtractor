@@ -1,0 +1,8 @@
+{
+  "gui": "ok",
+  "av": "14.2.0",
+  "opencv": "4.11.0",
+  "tesseract": "tesseract 5.5.3",
+  "ocr": "HELLO 123",
+  "success": true
+}

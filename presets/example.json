@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "name": "OCR 및 이미지 혼합 예제",
+  "image": "event.png",
+  "region": {
+    "x": 0,
+    "y": 0,
+    "width": 200,
+    "height": 100
+  },
+  "threshold": 0.9,
+  "scales": [
+    1.0
+  ],
+  "interval": 0.2,
+  "delay": 2,
+  "absence": 0.0,
+  "output_directory": "",
+  "items": [
+    {
+      "name": "이름",
+      "kind": "ocr",
+      "region": {
+        "x": 10,
+        "y": 100,
+        "width": 200,
+        "height": 40
+      },
+      "enabled": true,
+      "id": "ec6573ad-88a8-441b-ba2e-07e33bcc25d8",
+      "image": "",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "language": "kor+eng",
+      "fallback": "인식실패",
+      "zoom": 2.0,
+      "grayscale": true,
+      "binary": false,
+      "denoise": false,
+      "contrast": 1.0
+    },
+    {
+      "name": "승리 아이콘",
+      "kind": "image",
+      "region": {
+        "x": 220,
+        "y": 100,
+        "width": 100,
+        "height": 100
+      },
+      "enabled": true,
+      "id": "d9c3dc4b-70eb-419f-a2c2-f3d9a109f05a",
+      "image": "victory.png",
+      "threshold": 0.9,
+      "scales": [
+        1.0
+      ],
+      "language": "eng",
+      "fallback": "",
+      "zoom": 2.0,
+      "grayscale": true,
+      "binary": false,
+      "denoise": false,
+      "contrast": 1.0
+    }
+  ]
+}
