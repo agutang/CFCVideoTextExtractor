@@ -12,8 +12,10 @@ from core.video_reader import VideoReader
 from core.analysis_worker import AnalysisWorker
 from core.extraction_processor import Processor
 from services.output_writer import timestamp, format_row
-from services.configuration import data_dir
+from services.configuration import data_dir, presets_dir
 from services import preset_service
+from services.i18n import tr, set_language, localize_widgets
+from gui.output_format_dialog import OutputFormatDialog
 
 class TestWorker(QThread):
     result = Signal(str)
@@ -28,12 +30,12 @@ class TestWorker(QThread):
         try:
             messages = []
             processor = Processor(self.preset, messages.append)
-            processor.validate(self.frame)
-            score = processor.detector.score(self.frame, self.preset.region, self.preset.image, self.preset.scales)
+            processor.validate(self.frame, require_event=False)
+            score = processor.detector.score(self.frame, self.preset.region, self.preset.image, self.preset.scales) if self.preset.image else None
             values = processor.extract(self.frame)
-            lines = [f'이벤트 감지: {score >= self.preset.threshold} (유사도 {score:.4f})']
+            lines = [tr('이벤트 감지: {0} (유사도 {1:.4f})').format(score >= self.preset.threshold, score) if score is not None else tr('이벤트 기준 미등록: 이벤트 감지 생략')]
             lines += [f'{item.name}: {value}' for item, value in zip((i for i in self.preset.items if i.enabled), values)]
-            lines += messages + ['TXT 미리보기: ' + format_row(values, self.time)]
+            lines += messages + [tr('TXT 미리보기: ') + format_row(values, self.time, self.preset.output_template, [i.name for i in self.preset.items if i.enabled])]
             self.result.emit('\n'.join(lines))
         except Exception as exc:
             self.failed.emit(str(exc))
@@ -44,7 +46,8 @@ class TestWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('CFC 영상 데이터 추출기')
+        presets_dir()
+        self.setWindowTitle(tr('CFC 영상 데이터 추출기'))
         self.resize(1350, 900)
         self.preset = Preset()
         self.video = ''
@@ -59,9 +62,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
         toolbar = QHBoxLayout()
-        self.add_button(toolbar, '영상 선택', self.open_video)
-        self.info = QLabel('MP4 / MKV 영상을 선택하세요')
+        self.add_button(toolbar, tr('영상 선택'), self.open_video)
+        self.info = QLabel(tr('MP4 / MKV 영상을 선택하세요'))
         toolbar.addWidget(self.info, 1)
+        self.add_button(toolbar, 'Language', self.change_language)
         layout.addLayout(toolbar)
         splitter = QSplitter()
         layout.addWidget(splitter, 1)
@@ -69,21 +73,22 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left)
         self.preview = VideoPreview()
         self.preview.selected.connect(self.region_selected)
+        self.preview.video_dropped.connect(self.load_video)
         left_layout.addWidget(self.preview, 1)
         self.timeline = QSlider(Qt.Horizontal)
         self.timeline.setRange(0, 0)
         self.timeline.sliderReleased.connect(lambda: self.seek(self.timeline.value()/1000))
         left_layout.addWidget(self.timeline)
         controls = QHBoxLayout()
-        self.add_button(controls, '이전 프레임', self.previous_frame)
-        self.add_button(controls, '다음 프레임', self.next_frame)
+        self.add_button(controls, tr('이전 프레임'), self.previous_frame)
+        self.add_button(controls, tr('다음 프레임'), self.next_frame)
         self.position = number(0, 10000000)
         controls.addWidget(self.position)
-        self.add_button(controls, '초로 이동', lambda: self.seek(self.position.value()))
+        self.add_button(controls, tr('초로 이동'), lambda: self.seek(self.position.value()))
         self.time_label = QLabel('00:00:00.000')
         controls.addWidget(self.time_label)
         left_layout.addLayout(controls)
-        self.add_button(left_layout, '현재 프레임에서 감지 / 추출 테스트', self.test_frame)
+        self.add_button(left_layout, tr('현재 프레임에서 감지 / 추출 테스트'), self.test_frame)
         self.tabs = QTabWidget()
         splitter.addWidget(left)
         splitter.addWidget(self.tabs)
@@ -93,14 +98,14 @@ class MainWindow(QMainWindow):
         self.build_preset_tab()
         self.tabs.currentChanged.connect(self.refresh_regions)
         run = QHBoxLayout()
-        self.start_button = self.add_button(run, '분석 시작', self.start_analysis)
-        self.pause_button = self.add_button(run, '일시정지', lambda: self.set_pause(True))
-        self.resume_button = self.add_button(run, '재개', lambda: self.set_pause(False))
-        self.stop_button = self.add_button(run, '분석 중단', self.stop_analysis)
+        self.start_button = self.add_button(run, tr('분석 시작'), self.start_analysis)
+        self.pause_button = self.add_button(run, tr('일시정지'), lambda: self.set_pause(True))
+        self.resume_button = self.add_button(run, tr('재개'), lambda: self.set_pause(False))
+        self.stop_button = self.add_button(run, tr('분석 중단'), self.stop_analysis)
         self.progress = QProgressBar()
         run.addWidget(self.progress, 1)
         layout.addLayout(run)
-        self.status = QLabel('준비')
+        self.status = QLabel(tr('준비'))
         layout.addWidget(self.status)
         self.logs = QPlainTextEdit()
         self.logs.setReadOnly(True)
@@ -108,6 +113,28 @@ class MainWindow(QMainWindow):
         self.logs.setMaximumHeight(180)
         layout.addWidget(self.logs)
         self.set_running(False)
+        localize_widgets(self)
+
+    def change_language(self):
+        choices = ['한국어', 'English', '日本語']
+        selected, ok = QInputDialog.getItem(self, 'Language', 'Select language', choices, 0, False)
+        if ok:
+            self.set_ui_language(['ko', 'en', 'ja'][choices.index(selected)])
+
+    def set_ui_language(self, language):
+        set_language(language)
+        localize_widgets(self)
+        self.update_list(self.items.currentRow())
+        if hasattr(self, '_last_progress'):
+            self.on_progress(*self._last_progress)
+
+    def edit_output_format(self):
+        def action():
+            self.editor.apply()
+            dialog = OutputFormatDialog(self.preset, self)
+            if dialog.exec():
+                self.preset.output_template = dialog.template.text()
+        self.guarded(action)
 
     @staticmethod
     def add_button(layout, text, callback):
@@ -120,12 +147,13 @@ class MainWindow(QMainWindow):
         try:
             return action()
         except Exception as exc:
-            logging.exception('작업 오류')
+            logging.exception(tr('작업 오류'))
             self.error(str(exc))
 
     def error(self, message):
-        self.log('오류: ' + message)
-        QMessageBox.warning(self, '오류', message)
+        message = tr(message)
+        self.log(tr('오류: ') + message)
+        QMessageBox.warning(self, tr('오류'), message)
 
     def log(self, message):
         self.logs.appendPlainText(message)
@@ -142,15 +170,15 @@ class MainWindow(QMainWindow):
         self.interval = number(.2, 3600)
         self.delay = number(0, 1000000)
         self.absence = number(0, 3600)
-        for text, field in [('이벤트 기준 이미지', self.event_image), ('원본 좌표', self.event_region),
-                            ('유사도 임계값', self.threshold), ('스케일 (예: 0.8, 1, 1.2)', self.scales),
-                            ('탐색 간격 (초, 0=모든 프레임)', self.interval), ('추출 지연 (초)', self.delay),
-                            ('연속 미감지 시간 (초)', self.absence)]:
+        for text, field in [(tr('이벤트 기준 이미지'), self.event_image), (tr('원본 좌표'), self.event_region),
+                            (tr('유사도 임계값'), self.threshold), (tr('스케일 (예: 0.8, 1, 1.2)'), self.scales),
+                            (tr('탐색 간격 (초, 0=모든 프레임)'), self.interval), (tr('추출 지연 (초)'), self.delay),
+                            (tr('연속 미감지 시간 (초)'), self.absence)]:
             form.addRow(text, field)
-        note = QLabel('미감지 안정화는 재감지 준비만 늦춥니다.\n새 감지는 즉시 이벤트가 되며, 그 PTS부터 지연을 계산합니다.\n드래그 영역은 현재 탭의 선택 항목에 적용됩니다.')
+        note = QLabel(tr('미감지 안정화는 재감지 준비만 늦춥니다.\n새 감지는 즉시 이벤트가 되며, 그 PTS부터 지연을 계산합니다.\n드래그 영역은 현재 탭의 선택 항목에 적용됩니다.'))
         note.setWordWrap(True)
         form.addRow(note)
-        self.tabs.addTab(widget, '이벤트 감지')
+        self.tabs.addTab(widget, tr('이벤트 감지'))
 
     def build_items_tab(self):
         widget = QWidget()
@@ -159,10 +187,10 @@ class MainWindow(QMainWindow):
         self.items.currentRowChanged.connect(self.select_item)
         layout.addWidget(self.items)
         row = QHBoxLayout()
-        self.add_button(row, '항목 추가', self.add_item)
-        self.add_button(row, '삭제', self.delete_item)
-        self.add_button(row, '위로', lambda: self.move_item(-1))
-        self.add_button(row, '아래로', lambda: self.move_item(1))
+        self.add_button(row, tr('항목 추가'), self.add_item)
+        self.add_button(row, tr('삭제'), self.delete_item)
+        self.add_button(row, tr('위로'), lambda: self.move_item(-1))
+        self.add_button(row, tr('아래로'), lambda: self.move_item(1))
         layout.addLayout(row)
         self.editor = ItemEditor()
         self.editor.changed.connect(self.refresh_regions)
@@ -170,26 +198,29 @@ class MainWindow(QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.editor)
         layout.addWidget(scroll, 1)
-        self.add_button(layout, '항목 편집 적용', lambda: self.guarded(self.apply_item))
-        self.tabs.addTab(widget, '추출 항목')
+        self.add_button(layout, tr('항목 편집 적용'), lambda: self.guarded(self.apply_item))
+        formatting = QHBoxLayout()
+        self.add_button(formatting, tr('출력 형식 변경'), self.edit_output_format)
+        layout.addLayout(formatting)
+        self.tabs.addTab(widget, tr('추출 항목'))
 
     def build_preset_tab(self):
         widget = QWidget()
         layout = QFormLayout(widget)
         self.preset_name = QLineEdit(self.preset.name)
         self.output_dir = QLineEdit()
-        layout.addRow('프리셋 이름', self.preset_name)
-        layout.addRow('출력 폴더 (공백=영상 폴더)', self.output_dir)
-        self.add_button(layout, '출력 폴더 선택', self.choose_output)
-        for text, callback in [('새 프리셋', self.new_preset), ('프리셋 불러오기', self.load_preset),
-                               ('저장 / 이름 변경 반영', self.save_preset), ('다른 이름으로 저장', lambda: self.save_preset(True)),
-                               ('현재 프리셋 삭제', self.delete_preset), ('ZIP 내보내기', self.export_preset),
-                               ('ZIP 가져오기', self.import_preset)]:
+        layout.addRow(tr('프리셋 이름'), self.preset_name)
+        layout.addRow(tr('출력 폴더 (공백=영상 폴더)'), self.output_dir)
+        self.add_button(layout, tr('출력 폴더 선택'), self.choose_output)
+        for text, callback in [(tr('새 프리셋'), self.new_preset), (tr('프리셋 불러오기'), self.load_preset),
+                               (tr('저장 / 이름 변경 반영'), self.save_preset), (tr('다른 이름으로 저장'), lambda: self.save_preset(True)),
+                               (tr('현재 프리셋 삭제'), self.delete_preset), (tr('ZIP 내보내기'), self.export_preset),
+                               (tr('ZIP 가져오기'), self.import_preset)]:
             self.add_button(layout, text, callback)
-        self.tabs.addTab(widget, '프리셋 / 출력')
+        self.tabs.addTab(widget, tr('프리셋 / 출력'))
 
     def choose_output(self):
-        path = QFileDialog.getExistingDirectory(self, '출력 폴더')
+        path = QFileDialog.getExistingDirectory(self, tr('출력 폴더'))
         if path:
             self.output_dir.setText(path)
 
@@ -215,7 +246,8 @@ class MainWindow(QMainWindow):
         self.items.clear()
         for item in self.preset.items:
             r = item.region
-            self.items.addItem(f'{"●" if item.enabled else "○"} {item.name} [{item.kind}] ({r.x},{r.y},{r.width},{r.height})')
+            kind = tr('문자열 (OCR)') if item.kind == 'ocr' else tr('이미지 존재 여부')
+            self.items.addItem(f'{"●" if item.enabled else "○"} {item.name} [{kind}] ({r.x},{r.y},{r.width},{r.height})')
         self.items.setCurrentRow(index)
         self.items.blockSignals(False)
 
@@ -229,11 +261,11 @@ class MainWindow(QMainWindow):
         self.guarded(action)
 
     def add_item(self):
-        kind, ok = QInputDialog.getItem(self, '추출 항목 추가', '유형', ['문자열 (OCR)', '이미지 존재 여부'], 0, False)
+        kind, ok = QInputDialog.getItem(self, tr('추출 항목 추가'), tr('유형'), [tr('문자열 (OCR)'), tr('이미지 존재 여부')], 0, False)
         if ok:
             def action():
                 self.editor.apply()
-                item = ExtractionItem(name=f'항목 {len(self.preset.items)+1}', kind='ocr' if kind.startswith('문자열') else 'image')
+                item = ExtractionItem(name=tr('항목 {0}').format(len(self.preset.items) + 1), kind='ocr' if kind.startswith(tr('문자열')) else 'image')
                 self.preset.items.append(item)
                 self.update_list(len(self.preset.items)-1)
                 self.editor.load(item)
@@ -278,7 +310,10 @@ class MainWindow(QMainWindow):
         self.refresh_regions()
 
     def open_video(self):
-        path, _ = QFileDialog.getOpenFileName(self, '영상 선택', '', '영상 (*.mkv *.mp4)')
+        path, _ = QFileDialog.getOpenFileName(self, tr('영상 선택'), '', tr('영상 (*.mkv *.mp4)'))
+        self.load_video(path)
+
+    def load_video(self, path):
         if not path:
             return
         def action():
@@ -343,7 +378,7 @@ class MainWindow(QMainWindow):
 
     def test_frame(self):
         if self.preview.frame is None:
-            self.error('먼저 영상을 선택하세요.')
+            self.error(tr('먼저 영상을 선택하세요.'))
             return
         if self.test_worker and self.test_worker.isRunning():
             return
@@ -362,13 +397,13 @@ class MainWindow(QMainWindow):
     def start_analysis(self):
         def action():
             if not self.video:
-                raise ValueError('먼저 영상을 선택하세요.')
+                raise ValueError(tr('먼저 영상을 선택하세요.'))
             preset = self.sync()
             if not any(i.enabled for i in preset.items):
-                raise ValueError('활성화된 추출 항목이 없습니다.')
+                raise ValueError(tr('활성화된 추출 항목이 없습니다.'))
             output = (Path(preset.output_directory) if preset.output_directory else Path(self.video).parent) / (Path(self.video).stem+'.txt')
             overwrite = output.exists()
-            if overwrite and QMessageBox.question(self, '덮어쓰기 확인', f'{output}\n기존 결과를 덮어쓸까요?') != QMessageBox.Yes:
+            if overwrite and QMessageBox.question(self, tr('덮어쓰기 확인'), tr('{0}\n기존 결과를 덮어쓸까요?').format(output)) != QMessageBox.Yes:
                 return
             self.worker = AnalysisWorker(self.video, preset, output, overwrite)
             self.worker.message.connect(self.log)
@@ -381,14 +416,15 @@ class MainWindow(QMainWindow):
         self.guarded(action)
 
     def on_progress(self, time, detected, completed, pending):
+        self._last_progress = time, detected, completed, pending
         duration = self.reader.duration if self.reader else 0
         self.progress.setValue(min(100, int(time/duration*100)) if duration else 0)
-        self.status.setText(f'{timestamp(time)} / {timestamp(duration)} | 감지 {detected} | 기록 {completed} | 대기 {pending}')
+        self.status.setText(tr('{0} / {1} | 감지 {2} | 기록 {3} | 대기 {4}').format(timestamp(time), timestamp(duration), detected, completed, pending))
 
     def set_pause(self, paused):
         if self.worker and self.worker.isRunning():
             self.worker.pause(paused)
-            self.log('일시정지 요청' if paused else '분석 재개')
+            self.log(tr('일시정지 요청') if paused else tr('분석 재개'))
 
     def stop_analysis(self):
         if self.worker:
@@ -413,7 +449,7 @@ class MainWindow(QMainWindow):
         self.refresh_regions()
         missing = [obj.image for obj in preset_service.references(preset) if obj.image and not Path(obj.image).is_file()]
         if missing:
-            self.error('이미지가 없습니다. 해당 이미지 선택 버튼으로 경로를 다시 지정하세요.\n'+'\n'.join(missing))
+            self.error(tr('이미지가 없습니다. 해당 이미지 선택 버튼으로 경로를 다시 지정하세요.\n')+'\n'.join(missing))
 
     def new_preset(self):
         self.preset_path = None
@@ -424,15 +460,15 @@ class MainWindow(QMainWindow):
             preset = self.sync()
             path = self.preset_path
             if save_as or not path:
-                path, _ = QFileDialog.getSaveFileName(self, '프리셋 저장', str(data_dir() / 'preset.json'), 'JSON (*.json)')
+                path, _ = QFileDialog.getSaveFileName(self, tr('프리셋 저장'), str(presets_dir() / 'preset.json'), 'JSON (*.json)')
             if path:
                 preset_service.save(preset, path)
                 self.preset_path = path
-                self.log(f'프리셋 저장: {path}')
+                self.log(tr('프리셋 저장: {0}').format(path))
         self.guarded(action)
 
     def load_preset(self):
-        path, _ = QFileDialog.getOpenFileName(self, '프리셋 불러오기', str(data_dir()), 'JSON (*.json)')
+        path, _ = QFileDialog.getOpenFileName(self, tr('프리셋 불러오기'), str(presets_dir()), 'JSON (*.json)')
         if path:
             def action():
                 self.populate(preset_service.load(path))
@@ -440,19 +476,19 @@ class MainWindow(QMainWindow):
             self.guarded(action)
 
     def delete_preset(self):
-        if self.preset_path and QMessageBox.question(self, '프리셋 삭제', '현재 JSON 프리셋을 삭제할까요?') == QMessageBox.Yes:
+        if self.preset_path and QMessageBox.question(self, tr('프리셋 삭제'), tr('현재 JSON 프리셋을 삭제할까요?')) == QMessageBox.Yes:
             def action():
                 Path(self.preset_path).unlink()
                 self.new_preset()
             self.guarded(action)
 
     def export_preset(self):
-        path, _ = QFileDialog.getSaveFileName(self, 'ZIP 내보내기', '', 'ZIP (*.zip)')
+        path, _ = QFileDialog.getSaveFileName(self, tr('ZIP 내보내기'), str(presets_dir() / 'preset.zip'), 'ZIP (*.zip)')
         if path:
             self.guarded(lambda: preset_service.export_zip(self.sync(), path))
 
     def import_preset(self):
-        path, _ = QFileDialog.getOpenFileName(self, 'ZIP 가져오기', '', 'ZIP (*.zip)')
+        path, _ = QFileDialog.getOpenFileName(self, tr('ZIP 가져오기'), str(presets_dir()), 'ZIP (*.zip)')
         if path:
             def action():
                 preset = preset_service.import_zip(path, data_dir() / 'imports')
@@ -464,7 +500,7 @@ class MainWindow(QMainWindow):
         active = [w for w in (self.worker, self.test_worker) if w and w.isRunning()]
         if active:
             self.stop_analysis()
-            self.log('작업 종료를 기다리는 중입니다. 종료 후 창을 다시 닫아 주세요.')
+            self.log(tr('작업 종료를 기다리는 중입니다. 종료 후 창을 다시 닫아 주세요.'))
             event.ignore()
             return
         if self.reader:

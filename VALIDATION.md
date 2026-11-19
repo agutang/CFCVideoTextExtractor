@@ -8,7 +8,7 @@
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-현재 32개 테스트가 통과했습니다. 테스트 소스는 `tests/test_core.py`, `tests/test_video_gui.py`, `tests/test_integration.py`입니다.
+현재 53개 테스트가 통과했습니다. 테스트 소스는 `tests/test_core.py`, `tests/test_video_gui.py`, `tests/test_integration.py`, `tests/test_requested_changes.py`입니다.
 
 | 범위 | 실행 결과 |
 |---|---|
@@ -46,3 +46,49 @@ Windows EXE도 실제 생성했습니다. 한국어·영어·일본어 모델을
 결과는 `exe-smoke.json`의 `success: true`, 화면은 `exe-smoke.png`입니다. 이 점검은 현재 개발 PC에서 수행했으므로 Python이 없는 별도 클린 PC 검증과는 구분합니다. PyInstaller의 선택적·다른 OS용 모듈 누락 경고는 생성되었으나 이 실행 경로에서는 오류가 없었습니다.
 
 검증하지 않은 범위: 사용자 실제 영상의 인식 정확도, 모든 MKV/MP4 코덱, Windows 10 별도 PC, Python 미설치 클린 PC, 수십 시간 실영상 부하, 물리 디스크 장애·타 프로그램의 파일 잠금 재현. 해당 오류에 대한 예외 처리는 구현했으나 모든 외부 조건을 재현한 것은 아닙니다.
+
+## 2026-11-19 변경 및 영향 검증
+
+기존 32개 테스트와 추가 19개 테스트를 실행해 **51 passed**를 확인했습니다. 추가 검증은 다음을 포함합니다.
+
+- 소스/EXE 위치 기준 presets 폴더 생성과 JSON 대화상자 기본 경로
+- 사용자 지정 이미지 존재/없음 문구와 빈 문자열, 기본 True/False 출력 유지
+- 정규식 숫자 추출, 날짜 캡처 재배치, 이름 있는 그룹, 미일치, 빈 패턴, 잘못된 패턴/그룹 참조 거부
+- 새 필드 없는 기존 프리셋 복원, 새 필드 JSON/ZIP 왕복
+- 실제 Qt drop 이벤트로 MP4 등록, 폴더/원격 URL/복수 파일/지원하지 않는 형식 거부
+- 이벤트 기준 미등록 테스트의 결과 생성과 전체 분석의 기준 이미지 필수 조건 유지
+- 한국어/영어/일본어 전환 시 버튼·탭·도움말 번역, 사용자 편집값과 기준 이미지 미리보기 보존
+- 잘못된 출력 형식의 대화상자 적용 거부 및 GUI 번역 카탈로그 누락 검사
+
+세 언어 화면을 Qt offscreen으로 렌더링해 `ui-ko.png`, `ui-en.png`, `ui-ja.png`에 저장했습니다. 일본어는 Windows MS Gothic, 한국어/영어는 맑은 고딕을 사용해 글리프 누락을 피합니다. 실제 마우스를 이용한 모든 대화상자 수동 검증과는 구분합니다.
+
+영향 범위: 출력 변환은 항목의 추출값에만 적용하고 TXT 기록기는 변경하지 않았습니다. 새 필드는 기본값을 갖는 추가 필드로 도입해 기존 프리셋을 읽을 수 있습니다. 전체 분석의 이벤트/PTS/예약/CSV 처리 규칙은 유지하고, 테스트에서만 이벤트 기준 미등록을 허용합니다. GUI 언어와 OCR 언어 및 사용자 출력값은 서로 독립적입니다. 프리셋 기본 경로 이외의 로그/ZIP 가져오기 데이터 경로는 유지합니다.
+
+변경 파일:
+
+| 파일 | 내용 |
+|---|---|
+| `requirements.md`, `README.md`, `VALIDATION.md` | 요구사항 충돌 정리, 사용법, 영향 및 검증 기록 |
+| `models/preset.py` | 이미지 출력 문구, 항목별 정규식 설정 및 검증 |
+| `services/configuration.py` | 실행 위치 기준 presets 디렉터리 생성 |
+| `services/text_format.py` (추가) | 정규식 검증과 값 변환 |
+| `services/i18n.py` (추가) | 세 언어 카탈로그, Qt 표준 대화상자 번역, 글꼴 선택 |
+| `services/preset_service.py` | 프리셋 오류 메시지 다국어 적용 |
+| `gui/main_window.py` | 기본 프리셋 경로, 출력 형식/도움말/Language 버튼, 테스트 조건, 공통 영상 로딩 |
+| `gui/extraction_editor.py` | 이미지 출력 문구 입력, 편집값 복원·저장, 다국어 레이블 |
+| `gui/output_format_dialog.py` (추가) | 정규식 편집과 세 언어 예시 도움말 |
+| `gui/video_preview.py` | 지원하는 로컬 영상 드래그 앤 드롭 |
+| `gui/application.py` | 기본 한국어와 글꼴 설정 연결 |
+| `core/extraction_processor.py` | 사용자 문구·정규식 적용, 테스트용 이벤트 검증 옵션 |
+| `core/analysis_worker.py`, `core/image_detector.py`, `core/ocr_engine.py`, `core/video_reader.py` | 상태·오류 메시지 번역 연결; 분석 규칙은 유지 |
+| `tests/test_requested_changes.py` (추가) | 추가 기능 및 기존 동작 호환성 회귀 테스트 |
+
+Windows EXE를 최신 소스로 다시 빌드했고 자체 점검의 `success: true`를 확인했습니다. EXE 옆 `presets/` 폴더 생성도 확인했습니다. 실행 파일은 `dist/CFCVideoTextExtractor/`의 최신 빌드를 사용해야 합니다.
+
+## Latest template/native-dialog revision
+
+53 tests passed. Removed item search/replacement processing, associated help UI and translations. Output formatting is now a preset-wide template whose fields exactly reference enabled extraction item names. The default empty template retains the original output. A nonempty template is emitted as one CSV field followed by the existing PTS timestamp. Template validation runs before opening the result file. Existing presets load with an empty template and unsupported old item fields are discarded. Native Windows file/folder dialogs are restored (their controls use the OS language).
+
+Changed files: requirements.md, README.md, VALIDATION.md; models/preset.py; services/text_format.py, services/output_writer.py, services/i18n.py; gui/main_window.py, gui/extraction_editor.py, gui/output_format_dialog.py; core/analysis_worker.py, core/extraction_processor.py; tests/test_requested_changes.py.
+
+Verified: item-name lookup including spaces and dots, braces escaping, duplicate/missing fields, empty-template legacy CSV, template CSV escaping and timestamp, JSON/ZIP roundtrip, removal of help button, native-dialog default options. Existing event scheduling, OCR, video decoding and localization regressions also pass. Native Windows dialogs were verified through their invocation options; full manual OS dialog interaction was not performed. Earlier dated notes describe historical behavior superseded by this revision.

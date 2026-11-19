@@ -1,3 +1,4 @@
+from services.i18n import tr
 import cv2
 import numpy as np
 
@@ -10,9 +11,9 @@ class ImageDetector:
             try:
                 image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
             except (OSError, ValueError) as exc:
-                raise ValueError(f'기준 이미지를 읽을 수 없습니다: {path}') from exc
+                raise ValueError(tr('기준 이미지를 읽을 수 없습니다: {0}').format(path)) from exc
             if image is None:
-                raise ValueError(f'이미지가 손상되었습니다: {path}')
+                raise ValueError(tr('이미지가 손상되었습니다: {0}').format(path))
             self.cache[path] = image
         return self.cache[path]
 
@@ -35,5 +36,5 @@ class ImageDetector:
                 value = float(cv2.minMaxLoc(cv2.matchTemplate(roi, resized, cv2.TM_CCOEFF_NORMED))[1])
             best = max(best, value)
         if not fits:
-            raise ValueError('모든 스케일의 기준 이미지가 탐색 영역보다 큽니다.')
+            raise ValueError(tr('모든 스케일의 기준 이미지가 탐색 영역보다 큽니다.'))
         return best

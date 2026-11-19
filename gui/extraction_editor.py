@@ -1,3 +1,4 @@
+from services.i18n import tr
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QWidget, QFormLayout, QHBoxLayout, QVBoxLayout, QLineEdit,
@@ -19,7 +20,7 @@ class RegionEditor(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.values = []
-        for name in ('X', 'Y', '폭', '높이'):
+        for name in ('X', 'Y', tr('폭'), tr('높이')):
             layout.addWidget(QLabel(name))
             spin = QSpinBox()
             spin.setRange(0, 100000)
@@ -45,7 +46,7 @@ class ImageEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()
         self.path = QLineEdit()
-        button = QPushButton('이미지 선택')
+        button = QPushButton(tr('이미지 선택'))
         button.clicked.connect(self.browse)
         row.addWidget(self.path)
         row.addWidget(button)
@@ -56,7 +57,7 @@ class ImageEditor(QWidget):
         self.path.textChanged.connect(self.refresh)
 
     def browse(self):
-        path, _ = QFileDialog.getOpenFileName(self, '기준 이미지', '', '이미지 (*.png *.jpg *.jpeg)')
+        path, _ = QFileDialog.getOpenFileName(self, tr('기준 이미지'), '', tr('이미지 (*.png *.jpg *.jpeg)'))
         if path:
             self.path.setText(path)
 
@@ -72,14 +73,16 @@ class ItemEditor(QWidget):
         self.item = None
         form = QFormLayout(self)
         self.name = QLineEdit()
-        self.enabled = QCheckBox('활성화')
+        self.enabled = QCheckBox(tr('활성화'))
         self.kind = QComboBox()
-        self.kind.addItem('문자열 (OCR)', 'ocr')
-        self.kind.addItem('이미지 존재 여부', 'image')
+        self.kind.addItem(tr('문자열 (OCR)'), 'ocr')
+        self.kind.addItem(tr('이미지 존재 여부'), 'image')
         self.region = RegionEditor()
         self.image = ImageEditor()
         self.threshold = number(.9, 1)
         self.scales = QLineEdit('1.0')
+        self.present_text = QLineEdit('True')
+        self.absent_text = QLineEdit('False')
         self.language = QComboBox()
         self.language.setEditable(True)
         self.language.addItems(['eng', 'kor', 'jpn', 'kor+eng', 'jpn+eng'])
@@ -88,17 +91,18 @@ class ItemEditor(QWidget):
         self.zoom.setMinimum(.1)
         self.contrast = number(1, 10)
         self.contrast.setMinimum(.1)
-        self.gray = QCheckBox('그레이스케일')
-        self.binary = QCheckBox('이진화')
-        self.denoise = QCheckBox('노이즈 제거')
-        fields = [('이름', self.name), ('사용', self.enabled), ('유형', self.kind), ('원본 좌표', self.region),
-                  ('기준 이미지', self.image), ('유사도', self.threshold), ('스케일 (쉼표 구분)', self.scales),
-                  ('OCR 언어', self.language), ('실패 기본값', self.fallback), ('확대 배율', self.zoom),
-                  ('대비', self.contrast), ('전처리', self.gray), ('', self.binary), ('', self.denoise)]
+        self.gray = QCheckBox(tr('그레이스케일'))
+        self.binary = QCheckBox(tr('이진화'))
+        self.denoise = QCheckBox(tr('노이즈 제거'))
+        fields = [(tr('이름'), self.name), (tr('사용'), self.enabled), (tr('유형'), self.kind), (tr('원본 좌표'), self.region),
+                  (tr('기준 이미지'), self.image), (tr('유사도'), self.threshold), (tr('스케일 (쉼표 구분)'), self.scales),
+                  (tr('이미지 존재 시 출력'), self.present_text), (tr('이미지 없음 시 출력'), self.absent_text),
+                  (tr('OCR 언어'), self.language), (tr('실패 기본값'), self.fallback), (tr('확대 배율'), self.zoom),
+                  (tr('대비'), self.contrast), (tr('전처리'), self.gray), ('', self.binary), ('', self.denoise)]
         self.form = form
         for label, widget in fields:
             form.addRow(label, widget)
-        self.image_widgets = [self.image, self.threshold, self.scales]
+        self.image_widgets = [self.image, self.threshold, self.scales, self.present_text, self.absent_text]
         self.ocr_widgets = [self.language, self.fallback, self.zoom, self.contrast, self.gray, self.binary, self.denoise]
         self.kind.currentIndexChanged.connect(self.visibility)
         self.region.changed.connect(self.changed)
@@ -125,6 +129,8 @@ class ItemEditor(QWidget):
         self.image.path.setText(item.image)
         self.threshold.setValue(item.threshold)
         self.scales.setText(', '.join(map(str, item.scales)))
+        self.present_text.setText(item.present_text)
+        self.absent_text.setText(item.absent_text)
         self.language.setCurrentText(item.language)
         self.fallback.setText(item.fallback)
         self.zoom.setValue(item.zoom)
@@ -142,6 +148,7 @@ class ItemEditor(QWidget):
         item.region = self.region.region()
         item.image, item.threshold = self.image.path.text(), self.threshold.value()
         item.scales = [float(v.strip()) for v in self.scales.text().split(',')]
+        item.present_text, item.absent_text = self.present_text.text(), self.absent_text.text()
         item.language, item.fallback = self.language.currentText(), self.fallback.text()
         item.zoom, item.contrast = self.zoom.value(), self.contrast.value()
         item.grayscale, item.binary, item.denoise = self.gray.isChecked(), self.binary.isChecked(), self.denoise.isChecked()

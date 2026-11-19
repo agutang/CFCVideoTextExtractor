@@ -29,13 +29,19 @@ OCR은 Tesseract 5.5.3을 tesserocr로 직접 호출합니다. [tesserocr Window
 
 ## 사용 순서
 
-1. **영상 선택**으로 MP4/MKV를 엽니다. 해상도, FPS, 길이를 확인하고 슬라이더·초 이동·이전/다음 프레임으로 위치를 조절합니다.
+GUI 언어는 상단 **Language**에서 한국어·English·日本語 중 선택합니다. 화면 언어와 항목의 OCR 언어는 독립적이며, 언어를 바꿔도 사용자 입력값은 유지됩니다.
+
+1. **영상 선택** 또는 미리보기 영역으로 파일 하나를 드래그 앤 드롭하여 MP4/MKV를 엽니다. 해상도, FPS, 길이를 확인하고 슬라이더·초 이동·이전/다음 프레임으로 위치를 조절합니다.
 2. **이벤트 감지** 탭에서 PNG/JPG 기준 이미지를 선택합니다. 영상 위를 드래그하거나 X/Y/폭/높이를 입력합니다. 좌표는 화면 크기와 무관한 원본 픽셀 좌표입니다.
 3. 임계값(기본 0.9), 탐색 간격(기본 0.2초), 지연(기본 0), 연속 미감지 시간(기본 0)을 설정합니다. 짧은 이벤트를 모두 검사하려면 간격을 0으로 지정합니다. 다중 스케일은 `0.8, 1, 1.2`처럼 입력합니다.
 4. **추출 항목** 탭에서 OCR/이미지 항목을 추가합니다. 목록에서 항목을 선택하고 설정합니다. 이 탭에서 드래그하면 선택 항목의 영역이 바뀝니다. **항목 편집 적용**으로 목록 표시를 갱신합니다. 항목을 바꾸거나 분석·저장할 때도 편집 내용이 적용됩니다. 활성화를 끄면 해당 항목은 분석과 출력에서 제외됩니다. 위/아래로 출력 순서를 변경합니다.
-5. **현재 프레임에서 감지 / 추출 테스트**로 감지 유사도, 항목별 값, TXT 한 줄을 로그에서 확인합니다. 테스트는 결과 파일을 변경하지 않습니다.
+5. **현재 프레임에서 감지 / 추출 테스트**로 감지 유사도, 항목별 값, TXT 한 줄을 로그에서 확인합니다. 이벤트 기준 이미지가 비어 있으면 이벤트 감지를 생략하고 항목 테스트를 수행합니다. 등록한 기준 이미지가 손상되거나 없으면 오류를 안내합니다. 전체 분석에는 이벤트 기준 이미지가 필요합니다. 테스트는 결과 파일을 변경하지 않습니다.
 6. **프리셋 / 출력**에서 이름과 출력 폴더를 지정합니다. 공백이면 영상 폴더를 사용합니다. 여러 JSON 프리셋을 저장·로드·수정·삭제하고 ZIP으로 이미지와 함께 이동할 수 있습니다. 이름 필드 변경은 프리셋 내부 이름을 바꾸며, 파일 이름 변경은 다른 이름으로 저장을 사용합니다. 가져온 ZIP은 사용자 데이터 폴더의 고유 디렉터리에 저장됩니다.
 7. **분석 시작**을 누릅니다. 기존 결과가 있으면 덮어쓰기를 확인합니다. 일시정지/재개/중단을 지원합니다. 설정은 시작 시 복사되어 분석 중 편집해도 진행 중 결과에 영향을 주지 않습니다.
+
+프리셋 대화상자의 기본 위치는 소스 실행 시 프로젝트 루트의 `presets/`, EXE 실행 시 EXE 옆의 `presets/`입니다. 폴더는 프로그램 시작 시 생성하며 다른 위치도 선택할 수 있습니다. 기존 프리셋 저장은 원래 파일 위치를 유지합니다.
+
+
 
 ## 시간과 TXT 규칙
 
@@ -83,3 +89,9 @@ OCR은 Tesseract 5.5.3을 tesserocr로 직접 호출합니다. [tesserocr Window
 검증 결과와 미검증 사항은 `VALIDATION.md`를 확인하세요. 자동 테스트는 합성 데이터로 동작 규칙을 확인하며 실제 사용자 영상의 인식 정확도를 보장하지 않습니다.
 
 현재 작업 폴더에는 언어 모델과 Windows 빌드 결과가 준비되어 있습니다. `dist/CFCVideoTextExtractor/CFCVideoTextExtractor.exe`를 실행하면 됩니다. 소스와 EXE의 오프라인 자체 점검 결과는 `source-smoke.json`, `exe-smoke.json`에 있습니다. 자체 점검은 `--self-test 결과파일.json` 옵션으로 실행하며 GUI를 화면에 표시하지 않고 초기화·렌더링·모델 로드·OCR을 검사합니다.
+
+## Output templates
+
+Use the output formatting button to set a preset-wide template such as `{Name}: {Score}`. Field names must exactly match enabled extraction item names, including Korean or Japanese names. The dialog lists available fields. Use `{{` and `}}` for literal braces. Duplicate/empty names, unknown fields, invalid braces and format/conversion specifiers are rejected. Clear the template to restore the original ordered CSV output. With a template, its rendered result becomes one CSV field followed by the existing video timestamp. Image present/absent text and OCR fallback values remain available as field values. Templates are saved in JSON/ZIP presets; old presets default to an empty template. Unsupported old item formatting fields are discarded.
+
+File and folder selection uses native Windows dialogs; their standard controls follow Windows language settings.

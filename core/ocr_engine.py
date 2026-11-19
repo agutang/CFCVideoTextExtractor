@@ -1,3 +1,4 @@
+from services.i18n import tr
 import os
 import sys
 from pathlib import Path
@@ -16,12 +17,12 @@ class OCREngine:
     def check(self, language):
         missing = {lang for lang in language.split('+') if not lang or not (self.path / f'{lang}.traineddata').is_file()}
         if missing:
-            raise ValueError(f'OCR 언어 모델이 없습니다: {", ".join(sorted(missing))}')
+            raise ValueError(tr('OCR 언어 모델이 없습니다: {0}').format(', '.join(sorted(missing))))
         if language not in self.engines:
             try:
                 self.engines[language] = tesserocr.PyTessBaseAPI(path=str(self.path), lang=language, psm=tesserocr.PSM.SINGLE_BLOCK)
             except Exception as exc:
-                raise ValueError(f'OCR 엔진 초기화 실패 ({language}): {exc}') from exc
+                raise ValueError(tr('OCR 엔진 초기화 실패 ({0}): {1}').format(language, exc)) from exc
 
     def read(self, image, item):
         self.check(item.language)
@@ -39,7 +40,7 @@ class OCREngine:
         engine.SetImage(Image.fromarray(image))
         try:
             if not engine.Recognize(timeout=30000):
-                raise RuntimeError('OCR 인식에 실패했거나 제한시간을 초과했습니다.')
+                raise RuntimeError(tr('OCR 인식에 실패했거나 제한시간을 초과했습니다.'))
             return engine.GetUTF8Text().strip() or item.fallback
         finally:
             engine.Clear()

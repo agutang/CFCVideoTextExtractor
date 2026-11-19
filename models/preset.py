@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 from uuid import uuid4
 import math
 
@@ -36,6 +36,8 @@ class ExtractionItem:
     binary: bool = False
     denoise: bool = False
     contrast: float = 1.0
+    present_text: str = 'True'
+    absent_text: str = 'False'
 
 @dataclass
 class Preset:
@@ -48,6 +50,7 @@ class Preset:
     interval: float = .2
     delay: float = 0.0
     absence: float = 0.0
+    output_template: str = ''
     output_directory: str = ''
     items: list[ExtractionItem] = field(default_factory=list)
 
@@ -60,7 +63,7 @@ class Preset:
         if data.get('schema_version') != 1:
             raise ValueError('지원하지 않는 프리셋 버전입니다.')
         data['region'] = Region(**data['region'])
-        data['items'] = [ExtractionItem(**{**i, 'region': Region(**i['region'])}) for i in data['items']]
+        data['items'] = [ExtractionItem(**{**{k: v for k, v in i.items() if k in {f.name for f in fields(ExtractionItem)}}, 'region': Region(**i['region'])}) for i in data['items']]
         result = cls(**data)
         result.validate()
         return result
@@ -76,6 +79,8 @@ class Preset:
                 raise ValueError('스케일은 0 초과 10 이하입니다.')
         if len({i.id for i in self.items}) != len(self.items):
             raise ValueError('항목 ID가 중복되었습니다.')
+        from services.text_format import validate_template
+        validate_template(self.output_template, [i.name for i in self.items if i.enabled])
         for item in self.items:
             if item.kind not in ('ocr', 'image'):
                 raise ValueError('알 수 없는 항목 유형입니다.')

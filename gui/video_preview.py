@@ -5,6 +5,7 @@ from models.preset import Region
 
 class VideoPreview(QGraphicsView):
     selected = Signal(object)
+    video_dropped = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -16,6 +17,34 @@ class VideoPreview(QGraphicsView):
         self.frame = None
         self.setMinimumSize(480, 270)
         self.setAlignment(Qt.AlignCenter)
+        self.setAcceptDrops(True)
+
+    @staticmethod
+    def dropped_video(mime):
+        from pathlib import Path
+        urls = mime.urls() if mime.hasUrls() else []
+        if len(urls) == 1 and urls[0].isLocalFile():
+            path = Path(urls[0].toLocalFile())
+            if path.is_file() and path.suffix.lower() in ('.mp4', '.mkv'):
+                return str(path)
+        return None
+
+    def dragEnterEvent(self, event):
+        if self.dropped_video(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        path = self.dropped_video(event.mimeData())
+        if path:
+            event.acceptProposedAction()
+            self.video_dropped.emit(path)
+        else:
+            event.ignore()
 
     def set_frame(self, frame):
         self.frame = frame

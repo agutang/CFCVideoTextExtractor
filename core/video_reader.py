@@ -1,3 +1,4 @@
+from services.i18n import tr
 import math
 import av
 
@@ -9,7 +10,7 @@ class VideoReader:
         except Exception as exc:
             if hasattr(self, 'container'):
                 self.container.close()
-            raise ValueError(f'영상을 열 수 없습니다: {exc}') from exc
+            raise ValueError(tr('영상을 열 수 없습니다: {0}').format(exc)) from exc
         self.width = self.stream.codec_context.width
         self.height = self.stream.codec_context.height
         self.fps = float(self.stream.average_rate) if self.stream.average_rate else 0
@@ -20,13 +21,13 @@ class VideoReader:
         previous = -1.0
         for frame in self.container.decode(self.stream):
             if frame.pts is None or frame.time_base is None:
-                raise ValueError('영상 프레임의 PTS가 없습니다. 정확한 시간 분석이 불가능합니다.')
+                raise ValueError(tr('영상 프레임의 PTS가 없습니다. 정확한 시간 분석이 불가능합니다.'))
             raw = float(frame.pts * frame.time_base)
             if self.origin is None:
                 self.origin = raw
             timestamp = raw - self.origin
             if not math.isfinite(timestamp) or timestamp < -1e-6 or timestamp < previous - 1e-6:
-                raise ValueError('영상 타임스탬프가 잘못되었거나 역행합니다.')
+                raise ValueError(tr('영상 타임스탬프가 잘못되었거나 역행합니다.'))
             previous = max(0, timestamp)
             yield previous, frame.to_ndarray(format='bgr24')
 
@@ -41,7 +42,7 @@ class VideoReader:
             if timestamp + 1e-9 >= seconds:
                 return last
         if last is None:
-            raise ValueError('해당 시점의 프레임을 읽을 수 없습니다.')
+            raise ValueError(tr('해당 시점의 프레임을 읽을 수 없습니다.'))
         return last
 
     def close(self):
