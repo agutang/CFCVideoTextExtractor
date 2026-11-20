@@ -12,9 +12,9 @@ from core.video_reader import VideoReader
 from core.analysis_worker import AnalysisWorker
 from core.extraction_processor import Processor
 from services.output_writer import timestamp, format_row
-from services.configuration import data_dir, presets_dir
+from services.configuration import data_dir, presets_dir, save_language
 from services import preset_service
-from services.i18n import tr, set_language, localize_widgets
+from services.i18n import tr, set_language, localize_widgets, get_language
 from gui.output_format_dialog import OutputFormatDialog
 
 class TestWorker(QThread):
@@ -117,9 +117,11 @@ class MainWindow(QMainWindow):
 
     def change_language(self):
         choices = ['한국어', 'English', '日本語']
-        selected, ok = QInputDialog.getItem(self, 'Language', 'Select language', choices, 0, False)
+        selected, ok = QInputDialog.getItem(self, 'Language', 'Select language', choices, ['ko', 'en', 'ja'].index(get_language()), False)
         if ok:
-            self.set_ui_language(['ko', 'en', 'ja'][choices.index(selected)])
+            language = ['ko', 'en', 'ja'][choices.index(selected)]
+            self.set_ui_language(language)
+            self.guarded(lambda: save_language(language))
 
     def set_ui_language(self, language):
         set_language(language)

@@ -8,7 +8,7 @@
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-현재 53개 테스트가 통과했습니다. 테스트 소스는 `tests/test_core.py`, `tests/test_video_gui.py`, `tests/test_integration.py`, `tests/test_requested_changes.py`입니다.
+현재 63개 테스트가 통과했습니다. 테스트 소스는 `tests/test_core.py`, `tests/test_video_gui.py`, `tests/test_integration.py`, `tests/test_requested_changes.py`입니다.
 
 | 범위 | 실행 결과 |
 |---|---|
@@ -92,3 +92,9 @@ Windows EXE를 최신 소스로 다시 빌드했고 자체 점검의 `success: t
 Changed files: requirements.md, README.md, VALIDATION.md; models/preset.py; services/text_format.py, services/output_writer.py, services/i18n.py; gui/main_window.py, gui/extraction_editor.py, gui/output_format_dialog.py; core/analysis_worker.py, core/extraction_processor.py; tests/test_requested_changes.py.
 
 Verified: item-name lookup including spaces and dots, braces escaping, duplicate/missing fields, empty-template legacy CSV, template CSV escaping and timestamp, JSON/ZIP roundtrip, removal of help button, native-dialog default options. Existing event scheduling, OCR, video decoding and localization regressions also pass. Native Windows dialogs were verified through their invocation options; full manual OS dialog interaction was not performed. Earlier dated notes describe historical behavior superseded by this revision.
+
+## 2026-11-20 Language persistence
+
+63 tests passed, including ten language-settings cases: missing/corrupt/non-object/unsupported settings, Korean/English/Japanese startup restoration, dialog save and cancellation, preservation of unrelated settings. Tests use an isolated settings folder and do not modify real user preferences.
+
+Changed: services/configuration.py (atomic settings save and safe load), gui/application.py (restore on startup), services/i18n.py (current language accessor), gui/main_window.py (save accepted selection and preselect current language), tests/test_language_settings.py, README.md, requirements.md, VALIDATION.md. Existing extraction and preset behavior remains unchanged.

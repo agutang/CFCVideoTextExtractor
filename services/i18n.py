@@ -136,6 +136,9 @@ CATALOG.update({
         'ja': '未検出の安定化は再検出の準備のみを遅らせます。\n新規検出は即時イベントとなり、その PTS から遅延を計算します。\nドラッグは現在のタブ・選択項目の領域に適用されます。'},
 })
 
+def get_language() -> str:
+    return _language
+
 def set_language(language: str):
     global _language, _qt_translator
     if language not in ('ko', 'en', 'ja'):

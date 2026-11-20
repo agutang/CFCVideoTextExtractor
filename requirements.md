@@ -860,3 +860,7 @@ PyInstaller를 사용하여 EXE 파일을 생성하는 방법을 제공해 주�
 설계 단계에서 요구사항 간 충돌이나 기술적 문제가 발견되면 이를 설명하고, 기존 요구사항을 최대한 유지하는 해결 방법을 제안해 주세요.
 
 파일/폴더 선택 창은 Windows 기본 대화상자를 사용합니다. 네이티브 창의 표준 컨트롤 언어는 Windows 설정을 따릅니다.
+
+### GUI language persistence
+
+The selected GUI language is saved in the local user settings (settings.json under the application user data directory) and restored before creating the main window on subsequent launches. Missing, malformed or unsupported settings fall back to Korean. Cancelling the language dialog keeps the saved language. This preference is independent of presets and OCR language.
